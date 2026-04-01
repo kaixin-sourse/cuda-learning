@@ -1,0 +1,28 @@
+# Build directories
+cmake-build-*/
+build/
+out/
+
+# Compiled binaries and libraries
+*.exe
+*.obj
+*.o
+*.lib
+*.exp
+*.dll
+*.pdb
+
+# CUDA intermediate files
+*.cudafe1.cpp
+*.cudafe1.stub.c
+*.cudafe1.gpu
+*.fatbin
+*.module_id
+
+# IDE files
+.idea/
+.vs/
+
+# OS files
+Thumbs.db
+.DS_Store
