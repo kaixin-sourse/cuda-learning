@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdlib>
+#include <cuda_runtime.h>
 #include <iomanip>
 #include <iostream>
 #include <vector>
@@ -37,6 +38,7 @@ bool verifyResult(const std::vector<float>& a,
     return true;
 }
 
+// Run one benchmark case and return the elapsed kernel time in milliseconds.
 float runVectorAddBenchmark(int n, int blockSize) {
     size_t bytes = static_cast<size_t>(n) * sizeof(float);
 
@@ -62,6 +64,7 @@ float runVectorAddBenchmark(int n, int blockSize) {
 
     int gridSize = (n + blockSize - 1) / blockSize;
 
+    // CUDA events are used for basic GPU-side timing.
     cudaEvent_t start{};
     cudaEvent_t stop{};
     CHECK_CUDA(cudaEventCreate(&start));
@@ -73,6 +76,7 @@ float runVectorAddBenchmark(int n, int blockSize) {
     CHECK_CUDA(cudaEventRecord(stop));
     CHECK_CUDA(cudaEventSynchronize(stop));
 
+    // Compute elapsed time between start and stop.
     float elapsedMs = 0.0f;
     CHECK_CUDA(cudaEventElapsedTime(&elapsedMs, start, stop));
 
@@ -83,8 +87,11 @@ float runVectorAddBenchmark(int n, int blockSize) {
         std::exit(EXIT_FAILURE);
     }
 
+    // Release CUDA events.
     CHECK_CUDA(cudaEventDestroy(start));
     CHECK_CUDA(cudaEventDestroy(stop));
+
+    // Release device memory.
     CHECK_CUDA(cudaFree(d_a));
     CHECK_CUDA(cudaFree(d_b));
     CHECK_CUDA(cudaFree(d_c));
