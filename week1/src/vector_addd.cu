@@ -52,7 +52,7 @@ int main() {
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 
-    CHECK_CUDA(cudaMemcpy(h_c.data(),d_c,bytes,cudaMemcpyDevicetoHost));
+    CHECK_CUDA(cudaMemcpy(h_c.data(),d_c,bytes,cudaMemcpyDeviceToHost));
     // 传到cpu检验一下GPU做的是否正确
     bool ok = true;
     for(int i = 0; i < n; i ++) {
@@ -68,6 +68,7 @@ int main() {
     std::cout << "Result check: " << (ok ? "PASS" : "FAIL") << std::endl;
     CHECK_CUDA(cudaFree(d_a));
     CHECK_CUDA(cudaFree(d_b));
+
     CHECK_CUDA(cudaFree(d_c));
     return ok ? EXIT_SUCCESS:EXIT_FAILURE;
 }
