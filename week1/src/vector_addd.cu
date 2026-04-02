@@ -45,5 +45,29 @@ int main() {
     CHECK_CUDA(cudaMalloc(&d_c,bytes));
     CHECK_CUDA(cudaMemcpy(d_a,h_a.data(),bytes,cudaMemcpyHostToDevice));
     CHECK_CUDA(cudaMemcpy(d_b,h_b.data(),bytes,cudaMemcpyHostToDevice));
+    const int blockSize = 256;
+    const int gridSize = (n + blockSize - 1) / blockSize;
 
+    vectorAdddKernel<<<gridSize,blockSize>>>(d_a,d_b,d_c,n);
+    CHECK_CUDA(cudaGetLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+    CHECK_CUDA(cudaMemcpy(h_c.data(),d_c,bytes,cudaMemcpyDevicetoHost));
+    // 传到cpu检验一下GPU做的是否正确
+    bool ok = true;
+    for(int i = 0; i < n; i ++) {
+        bool expected = h_a[i] + h_b[i];
+        if(std::fabs(h_c[i] - expected) > 1e-5f) {
+            std::cerr << "Mismatch at " << i << ": got " << h_c[i]
+                      << ", expected " << expected << std::endl;
+            ok =false;
+            break;
+        }
+    }
+    std::cout << "gridSize = " << gridSize << ", blockSize = " << blockSize << std::endl;
+    std::cout << "Result check: " << (ok ? "PASS" : "FAIL") << std::endl;
+    CHECK_CUDA(cudaFree(d_a));
+    CHECK_CUDA(cudaFree(d_b));
+    CHECK_CUDA(cudaFree(d_c));
+    return ok ? EXIT_SUCCESS:EXIT_FAILURE;
 }
