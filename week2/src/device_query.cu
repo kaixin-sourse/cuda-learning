@@ -22,6 +22,23 @@ int main() {
         std::cout << "No CUDA-capable device found." << std::endl;
         return EXIT_SUCCESS;
     }
+    // 抄写一遍
+    for(int i = 0; i < deviceCount; i ++) {
+        cudaDeviceProp prop{};
+        CHECK_CUDA(cudaGetDeviceProperties(&prop,i));
+        std::cout << i << std::endl;
+        std::cout << prop.name << std::endl;
+        std::cout << prop.major << "." << prop.minor << std:: endl;
+        std::cout << static_cast<double>(prop.totalGlobalMem) / (1024.0 * 1024.0 * 1024.0) << "GB" << std::endl;
+        std::cout << prop.multiProcessorCount << std::endl;
+        std::cout << prop.warpSize << std::endl;
+        std::cout << prop.maxThreadsPerBlock << std::endl;
+        std::cout << prop.maxThreadsDim[0] << " " << prop.maxThreadsDim[1] << " " << prop.maxThreadsDim[2] << std::endl;
+        std::cout << prop.maxGridSize[0] << " " << prop.maxGridSize[1] << " " << prop.maxGridSize[2] << std::endl;
+        std::cout << prop.sharedMemPerBlock / 1024.0 << std::endl;
+        std::cout << prop.regsPerBlock << std::endl;
+    }
+
 
     for (int device = 0; device < deviceCount; ++device) {
         // 存储GPU信息的结构体
