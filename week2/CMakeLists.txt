@@ -17,3 +17,8 @@ add_executable(week2_vector_add_benchmark src/vector_add_benchmark.cu)
 set_target_properties(week2_vector_add_benchmark PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
+
+add_executable(week2_vector_addd_benchmark src/vecotr_addd_benchmark.cu)
+set_target_properties(week2_vector_addd_benchmark PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
+)

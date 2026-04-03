@@ -16,12 +16,6 @@
         }                                                                       \
     } while (0)
 
-__global__ void vectorAddKernel(const float* a, const float* b, float* c, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < n) {
-        c[idx] = a[idx] + b[idx];
-    }
-}
 
 bool verifyResult(const std::vector<float>& a,
                   const std::vector<float>& b,
@@ -38,76 +32,72 @@ bool verifyResult(const std::vector<float>& a,
     return true;
 }
 
-// Run one benchmark case and return the elapsed kernel time in milliseconds.
-float runVectorAddBenchmark(int n, int blockSize) {
+__global__ void vectorAddKernel(const float*d_a,const float*d_b,float*d_c,int n) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx < n) {
+        d_c[idx] = d_a[idx] + d_b[idx];
+    }
+}
+
+float runVectorAddBenchmark(int n,int blockSize) {
     size_t bytes = static_cast<size_t>(n) * sizeof(float);
 
     std::vector<float> h_a(n);
     std::vector<float> h_b(n);
-    std::vector<float> h_c(n, 0.0f);
+    std::vector<float> h_c(n,0.0f);
 
-    for (int i = 0; i < n; ++i) {
+    for(int i = 0; i < n; i ++) {
         h_a[i] = static_cast<float>(i) * 0.5f;
         h_b[i] = static_cast<float>(i) * 0.25f;
     }
-
     float* d_a = nullptr;
     float* d_b = nullptr;
     float* d_c = nullptr;
-
-    CHECK_CUDA(cudaMalloc(&d_a, bytes));
-    CHECK_CUDA(cudaMalloc(&d_b, bytes));
-    CHECK_CUDA(cudaMalloc(&d_c, bytes));
-
-    CHECK_CUDA(cudaMemcpy(d_a, h_a.data(), bytes, cudaMemcpyHostToDevice));
-    CHECK_CUDA(cudaMemcpy(d_b, h_b.data(), bytes, cudaMemcpyHostToDevice));
-
+    CHECK_CUDA(cudaMalloc(&d_a,bytes));
+    CHECK_CUDA(cudaMalloc(&d_b,bytes));
+    CHECK_CUDA(cudaMalloc(&d_c,bytes));
+    CHECK_CUDA(cudaMemcpy(d_a,h_a.data(),bytes,cudaMemcpyHostToDevice));
+    CHECK_CUDA(cudaMemcpy(d_b,h_b.data(),bytes,cudaMemcpyHostToDevice));
     int gridSize = (n + blockSize - 1) / blockSize;
-
-    // CUDA events are used for basic GPU-side timing.
-    cudaEvent_t start{};
+    cudaEvent_t  start{};
     cudaEvent_t stop{};
     CHECK_CUDA(cudaEventCreate(&start));
     CHECK_CUDA(cudaEventCreate(&stop));
-
     CHECK_CUDA(cudaEventRecord(start));
-    vectorAddKernel<<<gridSize, blockSize>>>(d_a, d_b, d_c, n);
+    //并发进行加法gridSize * blockSize * blockDimSize
+    vectorAddKernel<<<gridSize,blockSize>>> (d_a,d_b,d_c,n);
     CHECK_CUDA(cudaGetLastError());
     CHECK_CUDA(cudaEventRecord(stop));
-    // wait "stop" finish
     CHECK_CUDA(cudaEventSynchronize(stop));
 
-    // Compute elapsed time between start and stop.
-    float elapsedMs = 0.0f;
-    // calc time
-    CHECK_CUDA(cudaEventElapsedTime(&elapsedMs, start, stop));
-
-    CHECK_CUDA(cudaMemcpy(h_c.data(), d_c, bytes, cudaMemcpyDeviceToHost));
-
+    float elapsedMs= 0.0f;
+    CHECK_CUDA(cudaEventElapsedTime(&elapsedMs,start,stop));
+    CHECK_CUDA(cudaMemcpy(h_c.data(),d_c,bytes,cudaMemcpyDeviceToHost));
+    // 在cpu上面验证
     if (!verifyResult(h_a, h_b, h_c)) {
         std::cerr << "Result verification failed." << std::endl;
         std::exit(EXIT_FAILURE);
     }
-
-    // Release CUDA events.
+    // 结束后销毁GPU上面分配的内存（Global Memory）
     CHECK_CUDA(cudaEventDestroy(start));
     CHECK_CUDA(cudaEventDestroy(stop));
 
-    // Release device memory.
     CHECK_CUDA(cudaFree(d_a));
     CHECK_CUDA(cudaFree(d_b));
     CHECK_CUDA(cudaFree(d_c));
 
     return elapsedMs;
+
+
 }
 
 int main() {
     const std::vector<int> problemSizes = {
-        1 << 18,
-        1 << 20,
-        1 << 22
+            1 << 10,
+            1 << 12,
+            1 << 14
     };
-    const std::vector<int> blockSizes = {64, 128, 256, 512};
+    const std::vector<int> blockSizes = {64,128,256,512};
 
     std::cout << std::left
               << std::setw(14) << "Elements"
@@ -116,9 +106,9 @@ int main() {
               << std::endl;
     std::cout << std::string(40, '-') << std::endl;
 
-    for (int n : problemSizes) {
-        for (int blockSize : blockSizes) {
-            float elapsedMs = runVectorAddBenchmark(n, blockSize);
+    for(int n : problemSizes) {
+        for(int blockSize : blockSizes) {
+            float elapsedMs = runVectorAddBenchmark(n,blockSize);
             std::cout << std::left
                       << std::setw(14) << n
                       << std::setw(12) << blockSize
@@ -128,4 +118,5 @@ int main() {
     }
 
     return EXIT_SUCCESS;
+
 }
