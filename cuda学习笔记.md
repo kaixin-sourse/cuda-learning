@@ -1357,3 +1357,15 @@ __global__ void kernel(float* a, int n) {
 
 ![image-20260403161100310](C:\Users\27996\AppData\Roaming\Typora\typora-user-images\image-20260403161100310.png)
 
+子矩阵（tile）概念
+
+在矩阵乘法优化中，我们把矩阵划分成多个小块（tile），每个小块（tile）由一个线程块（block）来处理。
+
+3. tiledColA 和 tiledRowB 中存储的是什么？
+   tiledColA（A 的子块列）
+   int tiledColA = tile * kTileSize + threadIdx.x;
+   tile * kTileSize：这部分表示我们正在处理的 tile 的起始位置。tile 表示当前块的索引，kTileSize 表示每个 tile 的大小。比如，如果 tile = 1 且 kTileSize = 16，则 tile * kTileSize = 16，表示 A 中从第 16 列开始的部分。
+   threadIdx.x：表示当前线程在子块（tile）中的 x 方向索引，threadIdx.x 会在 0 到 kTileSize - 1 之间变化，表示当前线程处理的是 子矩阵中的第几列。
+
+所以，tiledColA 计算的是在 矩阵 A 中 当前子矩阵（tile）的位置，从 A 中提取一个 子矩阵列。
+

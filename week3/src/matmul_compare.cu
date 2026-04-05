@@ -21,7 +21,7 @@ constexpr int kTileSize = 16;
 __global__ void naiveMatmulKernel(const float* a, const float* b, float* c, int n) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
-
+    // 使用一维数组
     if (row < n && col < n) {
         float sum = 0.0f;
         for (int k = 0; k < n; ++k) {
@@ -32,14 +32,17 @@ __global__ void naiveMatmulKernel(const float* a, const float* b, float* c, int 
 }
 
 __global__ void tiledMatmulKernel(const float* a, const float* b, float* c, int n) {
+    // 16 * 16
     __shared__ float tileA[kTileSize][kTileSize];
     __shared__ float tileB[kTileSize][kTileSize];
-
+    // 对于每一个新的线程，这里面的变量都是独立的，也就是说每个线程的row都是不相互打扰的。
+    // 目前处理的是A中的第几行，线程真奇妙，我去
     int row = blockIdx.y * blockDim.y + threadIdx.y;
+    // 目前处理的是B中的第几列，我去
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
     float sum = 0.0f;
-
+    // 天才
     for (int tile = 0; tile < (n + kTileSize - 1) / kTileSize; ++tile) {
         int tiledColA = tile * kTileSize + threadIdx.x;
         int tiledRowB = tile * kTileSize + threadIdx.y;
@@ -55,8 +58,9 @@ __global__ void tiledMatmulKernel(const float* a, const float* b, float* c, int 
         } else {
             tileB[threadIdx.y][threadIdx.x] = 0.0f;
         }
-
+        // Ensure all the tiles fully loaded before using it.
         // Ensure the tile is fully loaded before using it.
+        // 终于弄懂你在等谁了
         __syncthreads();
 
         for (int k = 0; k < kTileSize; ++k) {
@@ -64,6 +68,7 @@ __global__ void tiledMatmulKernel(const float* a, const float* b, float* c, int 
         }
 
         // Ensure all threads are done before overwriting shared memory.
+        // 为了防止有的线程计算结束，到下一次重新写入tilea和tileb，而其他线程可能还没有完成上一次的矩阵乘法
         __syncthreads();
     }
 
