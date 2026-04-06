@@ -42,7 +42,7 @@ __global__ void reductionInterleavedKernel(const float* input, float* blockSums,
         // current synchronization step.
         __syncthreads();
     }
-
+    // Thread 0 writes the block's partial sum to global memory.
     if (tid == 0) {
         blockSums[blockIdx.x] = shared[0];
     }
@@ -57,13 +57,16 @@ __global__ void reductionSequentialKernel(const float* input, float* blockSums, 
     __syncthreads();
 
     // Sequential addressing avoids the modulo branch in the baseline kernel.
+    // Reverse order; avoid modulo operations.
     for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        // Gradually reduce the length of the effective interval,
+        // continuously retaining the left half.
         if (tid < stride) {
             shared[tid] += shared[tid + stride];
         }
         __syncthreads();
     }
-
+    // Thread 0 writes the block's partial sum to global memory.
     if (tid == 0) {
         blockSums[blockIdx.x] = shared[0];
     }
@@ -73,17 +76,20 @@ __global__ void reductionTwoLoadsKernel(const float* input, float* blockSums, in
     extern __shared__ float shared[];
 
     unsigned int tid = threadIdx.x;
+    // 每个block处理2 * blockDim.x * 2个数据
     unsigned int globalIdx = blockIdx.x * blockDim.x * 2 + threadIdx.x;
 
     float value = 0.0f;
+    // 每个线程处理globalIdx和globalIdx + blockDim.x这两个数据
     if (globalIdx < static_cast<unsigned int>(n)) {
         value += input[globalIdx];
     }
     if (globalIdx + blockDim.x < static_cast<unsigned int>(n)) {
         value += input[globalIdx + blockDim.x];
     }
-
+    // 标记一下
     shared[tid] = value;
+    // 每个线程进行到这里，进行同步
     __syncthreads();
 
     for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
@@ -97,6 +103,7 @@ __global__ void reductionTwoLoadsKernel(const float* input, float* blockSums, in
         blockSums[blockIdx.x] = shared[0];
     }
 }
+// “第三个 kernel 后面虽然和第二个一样，但前面已经把问题规模压缩了一次，因此后面这段相同代码处理的是更高密度的工作。”
 
 using ReductionKernel = void (*)(const float*, float*, int);
 
