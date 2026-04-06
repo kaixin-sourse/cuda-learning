@@ -1369,3 +1369,537 @@ __global__ void kernel(float* a, int n) {
 
 所以，tiledColA 计算的是在 矩阵 A 中 当前子矩阵（tile）的位置，从 A 中提取一个 子矩阵列。
 
+
+
+
+
+# Day 04
+
+* reduction ：归约，将若干数据归约成一个数据
+
+## 为什么叫 reduction
+
+因为它把：
+
+- **很多个元素**
+- “缩减”成
+- **一个元素**
+
+所以叫 **reduce / reduction**
+
+## 在 CUDA 里它为什么重要
+
+CUDA 有很多线程同时工作，所以很适合先让每个线程处理一部分数据，然后再把这些部分结果继续合并。
+
+比如：
+
+1. 每个线程先算一点
+2. 一个 block 内部把线程结果合并
+3. 多个 block 的结果再继续合并
+4. 最后得到总结果
+
+### 1. 全局归约
+
+对整个大数组求和、求最大值等。
+
+### 2. block 内归约
+
+一个 block 里的线程先把数据放到 `shared memory`，然后逐步合并。
+
+
+
+给我画一个 kernel、thread、block、grid 四者之间的结构图
+
+已思考若干秒
+
+可以，先看最直观的结构图。
+
+```
+一次 kernel 启动
+myKernel<<<grid, block>>>(...)
+
+┌──────────────────────────────────────────────┐
+│                  kernel                      │
+│        （运行在 GPU 上的一个函数）            │
+│                                              │
+│   grid = 由很多个 block 组成                  │
+│                                              │
+│   ┌───────────────┐  ┌───────────────┐       │
+│   │   block 0     │  │   block 1     │  ...  │
+│   │               │  │               │       │
+│   │ thread 0      │  │ thread 0      │       │
+│   │ thread 1      │  │ thread 1      │       │
+│   │ thread 2      │  │ thread 2      │       │
+│   │ ...           │  │ ...           │       │
+│   └───────────────┘  └───────────────┘       │
+│                                              │
+└──────────────────────────────────────────────┘
+```
+
+## 在线程代码里怎么区分自己
+
+每个线程都会执行同一份 kernel 代码，但它会通过这些变量知道自己是谁：
+
+- `threadIdx.x`：我在本 block 里是第几个线程
+- `blockIdx.x`：我在整个 grid 里是第几个 block
+- `blockDim.x`：每个 block 有多少线程
+- `gridDim.x`：整个 grid 有多少 block
+
+最常见写法：
+
+```
+int i = blockIdx.x * blockDim.x + threadIdx.x;
+```
+
+这个 `i` 就是“当前线程处理的全局编号”。
+
+------
+
+## 再画一个“编号”的图
+
+假设：
+
+```
+myKernel<<<3, 4>>>();
+```
+
+表示 3 个 block，每个 block 4 个线程。
+
+```
+block 0:  thread 0   thread 1   thread 2   thread 3
+           全局0      全局1      全局2      全局3
+
+block 1:  thread 0   thread 1   thread 2   thread 3
+           全局4      全局5      全局6      全局7
+
+block 2:  thread 0   thread 1   thread 2   thread 3
+           全局8      全局9      全局10     全局11
+```
+
+因为：
+
+```
+global_id = blockIdx.x * blockDim.x + threadIdx.x
+```
+
+假设我们启动一个 2 维的 CUDA kernel：
+
+```
+dim3 blockDim(4, 3);   // 每个 block: 4 列 × 3 行线程
+dim3 gridDim(2, 2);    // 整个 grid: 2 列 × 2 行 block
+
+myKernel<<<gridDim, blockDim>>>();
+```
+
+这表示：
+
+- **grid** 里有 `2 × 2 = 4` 个 block
+- 每个 **block** 里有 `4 × 3 = 12` 个 thread
+
+------
+
+## 1. 先看 2 维 grid 的结构
+
+```
+gridDim.x = 2, gridDim.y = 2
+
+           blockIdx.x →
+         0              1
+blockIdx.y
+   ↓
+0        ┌───────────┐  ┌───────────┐
+         │ block(0,0)│  │ block(1,0)│
+         └───────────┘  └───────────┘
+
+1        ┌───────────┐  ┌───────────┐
+         │ block(0,1)│  │ block(1,1)│
+         └───────────┘  └───────────┘
+```
+
+这里每个小方块都是一个 **block**。
+
+所以 2 维 grid 中，一个 block 通过：
+
+```
+blockIdx.x
+blockIdx.y
+```
+
+来确定自己在整个 grid 中的位置。
+
+------
+
+## 2. 再看一个 2 维 block 内部的线程结构
+
+假设：
+
+```
+blockDim.x = 4
+blockDim.y = 3
+```
+
+那么一个 block 内部线程排布是：
+
+```
+一个 block 内部
+
+           threadIdx.x →
+         0       1       2       3
+threadIdx.y
+   ↓
+0      (0,0)   (1,0)   (2,0)   (3,0)
+
+1      (0,1)   (1,1)   (2,1)   (3,1)
+
+2      (0,2)   (1,2)   (2,2)   (3,2)
+```
+
+这里每个格子是一个 **thread**。
+
+所以 2 维 block 中，一个线程通过：
+
+```
+threadIdx.x
+threadIdx.y
+```
+
+来确定自己在 block 内的位置。
+
+------
+
+## 3. 把 2 维 grid 和 2 维 block 合起来看
+
+```
+整个 kernel 启动后的结构：
+
+grid
+├── block(0,0)
+│    ├── thread(0,0) thread(1,0) thread(2,0) thread(3,0)
+│    ├── thread(0,1) thread(1,1) thread(2,1) thread(3,1)
+│    └── thread(0,2) thread(1,2) thread(2,2) thread(3,2)
+│
+├── block(1,0)
+│    ├── thread(0,0) thread(1,0) thread(2,0) thread(3,0)
+│    ├── thread(0,1) thread(1,1) thread(2,1) thread(3,1)
+│    └── thread(0,2) thread(1,2) thread(2,2) thread(3,2)
+│
+├── block(0,1)
+│    ├── ...
+│
+└── block(1,1)
+     ├── ...
+```
+
+注意一件事：
+
+- `thread(0,0)` 在不同 block 里会重复出现
+- 因为它只是“这个 block 内部的第 0 行第 0 列线程”
+
+所以真正唯一定位一个线程，需要同时看：
+
+```
+blockIdx.x, blockIdx.y
+threadIdx.x, threadIdx.y
+```
+
+------
+
+## 4. 线程的“全局坐标”怎么求
+
+这在矩阵、图像处理中最常用。
+
+### 全局列号 x
+
+```
+int x = blockIdx.x * blockDim.x + threadIdx.x;
+```
+
+### 全局行号 y
+
+```
+int y = blockIdx.y * blockDim.y + threadIdx.y;
+```
+
+意思是：
+
+- `blockIdx.x * blockDim.x`：先跳过前面那些 block 的列宽
+- `threadIdx.x`：再加上自己在当前 block 里的列偏移
+
+`y` 同理。
+
+------
+
+## 5. 用具体数字看全局坐标
+
+还是这个配置：
+
+```
+blockDim(4, 3)
+gridDim(2, 2)
+```
+
+### block(0,0) 负责的全局区域
+
+```
+x: 0~3
+y: 0~2
+```
+
+### block(1,0) 负责的全局区域
+
+```
+x: 4~7
+y: 0~2
+```
+
+### block(0,1) 负责的全局区域
+
+```
+x: 0~3
+y: 3~5
+```
+
+### block(1,1) 负责的全局区域
+
+```
+x: 4~7
+y: 3~5
+```
+
+合起来就是一个更大的二维区域：
+
+```
+整个全局线程覆盖区域
+
+y
+↑
+5   [ block(0,1) ] [ block(1,1) ]
+4   [ block(0,1) ] [ block(1,1) ]
+3   [ block(0,1) ] [ block(1,1) ]
+2   [ block(0,0) ] [ block(1,0) ]
+1   [ block(0,0) ] [ block(1,0) ]
+0   [ block(0,0) ] [ block(1,0) ]
+
+    0 1 2 3 4 5 6 7 → x
+```
+
+------
+
+## 6. 这为什么适合矩阵和图片
+
+因为矩阵、图片天生就是二维的。
+
+比如矩阵 `A[row][col]`，你就可以让每个线程处理一个元素：
+
+```
+int col = blockIdx.x * blockDim.x + threadIdx.x;
+int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+if (row < height && col < width) {
+    output[row][col] = input[row][col];
+}
+```
+
+这样就非常自然：
+
+- `x` 对应列
+- `y` 对应行
+
+------
+
+## 7. 一张压缩版记忆图
+
+```
+2维 grid:
+(blockIdx.x, blockIdx.y) 决定这个 block 在哪
+
+2维 block:
+(threadIdx.x, threadIdx.y) 决定这个线程在 block 里哪
+
+全局位置:
+x = blockIdx.x * blockDim.x + threadIdx.x
+y = blockIdx.y * blockDim.y + threadIdx.y
+```
+
+------
+
+## 8. 最后给你一个完整结构图
+
+```
+kernel
+└── 2D grid
+    ├── block(0,0)
+    │   ├── thread(0,0) thread(1,0) thread(2,0) ...
+    │   ├── thread(0,1) thread(1,1) thread(2,1) ...
+    │   └── ...
+    │
+    ├── block(1,0)
+    │   ├── thread(0,0) thread(1,0) thread(2,0) ...
+    │   ├── thread(0,1) thread(1,1) thread(2,1) ...
+    │   └── ...
+    │
+    ├── block(0,1)
+    │   └── ...
+    │
+    └── block(1,1)
+        └── ...
+```
+
+你可以直接把它理解成：
+
+**大方格里套小方格。**
+
+- 大方格：grid 里的 block
+- 小方格：block 里的 thread
+
+* GPU在调度线程时候，不是单独一个线程跑的，而是把 **32 个线程绑成一组** 来跑，这一组就叫 **warp**。
+
+## 直观理解
+
+你可以这样想：
+
+- **thread**：单个工人
+- **block**：一个班组
+- **warp**：班组里一次一起行动的小队
+
+比如一个 block 有 128 个线程，那么它会被分成：
+
+```
+128 / 32 = 4 个 warp
+```
+
+也就是：
+
+- warp 0：线程 0 ~ 31
+- warp 1：线程 32 ~ 63
+- warp 2：线程 64 ~ 95
+- warp 3：线程 96 ~ 127
+
+## 为什么 warp 很重要
+
+因为 GPU 执行指令时，**是按 warp 执行的，不是按单个 thread 执行的**。
+
+也就是说：
+
+- 一个 warp 里的 32 个线程
+- 通常会在同一时刻执行同一条指令
+- 只是它们处理的数据不同
+
+这就是 CUDA 里常说的 **SIMT** 思想：
+
+**Single Instruction, Multiple Threads**
+ 同一条指令，多个线程一起执行。
+
+## 举个例子
+
+看这段代码：
+
+```
+int i = blockIdx.x * blockDim.x + threadIdx.x;
+c[i] = a[i] + b[i];
+```
+
+假设一个 warp 里有 32 个线程：
+
+- 线程 0 算 `c[0]`
+- 线程 1 算 `c[1]`
+- ...
+- 线程 31 算 `c[31]`
+
+它们做的动作是一样的：
+
+```
+取 a[i]
+取 b[i]
+相加
+写回 c[i]
+```
+
+只是每个线程的 `i` 不一样。
+
+------
+
+## warp 和 block 的关系
+
+## warp 和 block 的关系
+
+### block 是你程序员定义的
+
+你可以写：
+
+```
+<<<grid, 128>>>
+```
+
+表示每个 block 128 个线程。
+
+### warp 是硬件执行时自动分出来的
+
+这 128 个线程会被自动拆成 4 个 warp。
+
+所以：
+
+```
+block 是“组织单位”
+warp 是“执行单位”
+```
+
+最好令一个warp中的线程访问连续地址，通常效率更高
+
+假设：
+
+```
+blockDim.x = 100
+```
+
+那会分成：
+
+```
+warp 0:  0 ~ 31
+warp 1: 32 ~ 63
+warp 2: 64 ~ 95
+warp 3: 96 ~ 99   （最后一个不满 32）
+```
+
+最后一个 warp 可能不满 32 个线程，但调度上仍按一个 warp 看待。
+
+* divergence：
+
+## 先说最核心的意思
+
+一个 warp 里有 32 个线程。
+ GPU 希望这 32 个线程**一起执行同一条指令**。
+
+但如果你写了分支：
+
+```
+if (条件) {
+    ...
+} else {
+    ...
+}
+```
+
+结果 warp 里的线程出现了这种情况：
+
+- 一部分线程满足条件，走 `if`
+- 另一部分线程不满足条件，走 `else`
+
+这就叫 **divergence（分歧）**。
+
+------
+
+## 为什么这会有问题
+
+因为一个 warp 往往是“成组执行”的。
+
+它不能真的让同一个 warp 里的线程，完全同时走两条不同的路。
+ 所以通常会变成：
+
+1. **先执行 `if` 这一边，让不该执行的线程先闲着**
+2. **再执行 `else` 这一边，让另一批线程闲着**
+
+这样本来可以整齐一起做的事，被拆成两次做，效率就下降了。
+
+并不是有分支就会慢，而是要看同一个warp内部线程是否有分裂
+

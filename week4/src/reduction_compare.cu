@@ -26,13 +26,20 @@ __global__ void reductionInterleavedKernel(const float* input, float* blockSums,
     unsigned int tid = threadIdx.x;
     unsigned int globalIdx = blockIdx.x * blockDim.x + threadIdx.x;
     shared[tid] = (globalIdx < static_cast<unsigned int>(n)) ? input[globalIdx] : 0.0f;
+    // wait all threads done
     __syncthreads();
 
     // Educational baseline: interleaved addressing with modulo based branching.
     for (unsigned int stride = 1; stride < blockDim.x; stride <<= 1) {
+        // well, Multithreading is truly amazing.
+        // Sum each pair of adjacent elements with a fixed step size.
+        // Tree Merging
+        // But all threads must wait for the modulo operation and the breance evaluation to complete.
         if ((tid % (2 * stride)) == 0) {
             shared[tid] += shared[tid + stride];
         }
+        // wait for all threads to complete the work for the
+        // current synchronization step.
         __syncthreads();
     }
 
