@@ -21,6 +21,7 @@ constexpr int kBlockSize = 256;
 constexpr int kNumElements = 1 << 22;
 
 __global__ void reductionInterleavedKernel(const float* input, float* blockSums, int n) {
+    // 数组大小通常会指定为blockDim.x
     extern __shared__ float shared[];
 
     unsigned int tid = threadIdx.x;
