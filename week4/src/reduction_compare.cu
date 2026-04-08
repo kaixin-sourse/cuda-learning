@@ -104,7 +104,7 @@ __global__ void reductionTwoLoadsKernel(const float* input, float* blockSums, in
         blockSums[blockIdx.x] = shared[0];
     }
 }
-// “第三个 kernel 后面虽然和第二个一样，但前面已经把问题规模压缩了一次，因此后面这段相同代码处理的是更高密度的工作。”
+// “第三个 kernel 后面虽然和第二个一样，但前面已经把问题规模压缩了一半，因此后面这段相同代码处理的是更高密度的工作。”
 
 using ReductionKernel = void (*)(const float*, float*, int);
 
