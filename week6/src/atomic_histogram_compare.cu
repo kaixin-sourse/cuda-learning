@@ -21,9 +21,7 @@ constexpr int kNumBins = 16;
 constexpr int kBlockSize = 256;
 
 __global__ void globalAtomicHistogramKernel(const int* input, int* globalHist, int n) {
-    for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
-         idx < n;
-         idx += blockDim.x * gridDim.x) {
+    for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < n; idx += blockDim.x * gridDim.x) {
         int value = input[idx];
         if (value >= 0 && value < kNumBins) {
             atomicAdd(&globalHist[value], 1);
@@ -33,12 +31,28 @@ __global__ void globalAtomicHistogramKernel(const int* input, int* globalHist, i
 
 __global__ void sharedAtomicHistogramKernel(const int* input, int* globalHist, int n) {
     __shared__ int localHist[kNumBins];
-
+    //举个例子
+    //
+    //假设：
+    //
+    //kNumBins = 10
+    //blockDim.x = 4
+    //
+    //那么 4 个线程会这样分工：
+    //
+    //threadIdx.x = 0：负责 bin = 0, 4, 8
+    //threadIdx.x = 1：负责 bin = 1, 5, 9
+    //threadIdx.x = 2：负责 bin = 2, 6
+    //threadIdx.x = 3：负责 bin = 3, 7
+    //
+    //这样所有 bin 都被覆盖，而且没有重复。
+    // kNumBins >= blockDim.x
     for (int bin = threadIdx.x; bin < kNumBins; bin += blockDim.x) {
         localHist[bin] = 0;
     }
     __syncthreads();
-
+    // one block done to next
+    // a grid's all block's all thread are doing things.
     for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
          idx < n;
          idx += blockDim.x * gridDim.x) {
@@ -58,7 +72,7 @@ enum class HistogramKernelKind {
     GlobalAtomic,
     SharedAtomic
 };
-
+// Hashmap
 std::vector<int> cpuHistogram(const std::vector<int>& input) {
     std::vector<int> hist(kNumBins, 0);
     for (int value : input) {
@@ -127,10 +141,12 @@ HistogramBenchmarkResult runGpuHistogram(const std::vector<int>& input, Histogra
 
 std::vector<int> makeSkewedInput(int n) {
     std::vector<int> input(n, 0);
+    // random root
     std::mt19937 rng(123);
+
     std::uniform_int_distribution<int> binDist(0, kNumBins - 1);
     std::uniform_real_distribution<float> probDist(0.0f, 1.0f);
-
+    // about 70% data is zero.
     for (int& value : input) {
         // Skew the distribution so that contention is visible.
         if (probDist(rng) < 0.70f) {
