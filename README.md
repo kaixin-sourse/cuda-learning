@@ -10,6 +10,8 @@
 - `week3/`：第 3 周骨架目录
 - `week4/`：第 4 周内容，reduction 与常见性能问题
 - `week5/`：第 5 周内容，scan 与 histogram
+- `week6/`：第 6 周内容，原子操作、top-k 与 CPU-GPU 对比
+- `week7/`：第 7 周内容，profiling 工具入门与分析目标程序
 - `projects/`：后续独立项目，例如 CT 成像或医学影像相关实验
 
 ## 使用方式
