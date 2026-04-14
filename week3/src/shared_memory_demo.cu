@@ -37,6 +37,7 @@ __global__ void blockSumKernel(const float* input, float* blockSums, int n) {
         for (int i = 0; i < blockDim.x; ++i) {
             sum += tile[i];
         }
+        // 放到对应blockSums中
         blockSums[blockIdx.x] = sum;
     }
 }
