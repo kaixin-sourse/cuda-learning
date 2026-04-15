@@ -28,9 +28,7 @@ __global__ void histogramKernel(const int* input, int* globalHist, int n) {
     __syncthreads();
 
     // Each thread processes a strided subset of the input.
-    for (int idx = blockIdx.x * blockDim.x + threadIdx.x;
-         idx < n;
-         idx += blockDim.x * gridDim.x) {
+    for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < n; idx += blockDim.x * gridDim.x) {
         int value = input[idx];
         if (value >= 0 && value < kNumBins) {
             atomicAdd(&localHist[value], 1);

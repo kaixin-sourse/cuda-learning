@@ -58,10 +58,8 @@ __global__ void blellochExclusiveScanKernel(const int* input, int* output) {
     output[ai] = temp[ai];
     output[bi] = temp[bi];
 }
-// 前缀和，不包含本身
 std::vector<int> cpuExclusiveScan(const std::vector<int>& input) {
     std::vector<int> output(input.size(), 0);
-    // 不包含本身
     int runningSum = 0;
     for (size_t i = 0; i < input.size(); ++i) {
         output[i] = runningSum;
