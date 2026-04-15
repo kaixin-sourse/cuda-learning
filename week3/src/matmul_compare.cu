@@ -17,7 +17,7 @@
     } while (0)
 
 constexpr int kTileSize = 16;
-
+//global matmul
 __global__ void naiveMatmulKernel(const float* a, const float* b, float* c, int n) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -69,6 +69,7 @@ __global__ void tiledMatmulKernel(const float* a, const float* b, float* c, int 
 
         // Ensure all threads are done before overwriting shared memory.
         // 为了防止有的线程计算结束，到下一次重新写入tilea和tileb，而其他线程可能还没有完成上一次的矩阵乘法
+        // 等待所有线程全部结束后，再进行下一轮tile矩阵读入
         __syncthreads();
     }
 

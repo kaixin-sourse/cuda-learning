@@ -39,6 +39,7 @@ __global__ void blockSumKernel(const float* input, float* blockSums, int n) {
         }
         // 放到对应blockSums中
         blockSums[blockIdx.x] = sum;
+        // 并没有求和
     }
 }
 

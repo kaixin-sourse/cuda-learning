@@ -1945,3 +1945,7 @@ CPU 耗时
 GPU 全局 atomic 耗时
 GPU shared atomic 耗时
 检查是否通过（PASS / FAIL）
+
+矩阵乘法加速：
+-   朴素版：global memory 直接做
+-   加速版：tile化，不断切割小矩阵，然后进行矩阵运算，减少频繁读取global memore的损耗时间

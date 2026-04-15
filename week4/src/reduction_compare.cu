@@ -62,6 +62,7 @@ __global__ void reductionSequentialKernel(const float* input, float* blockSums, 
     for (unsigned int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
         // Gradually reduce the length of the effective interval,
         // continuously retaining the left half.
+        // avoid modulo operations
         if (tid < stride) {
             shared[tid] += shared[tid + stride];
         }
