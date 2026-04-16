@@ -18,7 +18,7 @@
 constexpr int kNumBins = 16;
 constexpr int kBlockSize = 256;
 constexpr int kNumElements = 1 << 20;
-
+// clac the bin
 __global__ void histogramKernel(const int* input, int* globalHist, int n) {
     __shared__ int localHist[kNumBins];
 
