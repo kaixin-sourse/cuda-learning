@@ -14,6 +14,8 @@
 - `week7/`：第 7 周内容，profiling 工具入门与分析目标程序
 - `week8/`：第 8 周内容，基线版与优化版对比
 - `week9/`：第 9 周内容，streams、pinned memory 与 overlap
+- `week10/`：第 10 周内容，通用并行算法 mini library
+- `week11/`：第 11 周内容，医学影像/张量处理 CUDA 项目
 - `projects/`：后续独立项目，例如 CT 成像或医学影像相关实验
 
 ## 使用方式
