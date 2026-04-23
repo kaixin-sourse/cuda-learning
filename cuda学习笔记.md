@@ -1949,3 +1949,63 @@ GPU shared atomic 耗时
 矩阵乘法加速：
 -   朴素版：global memory 直接做
 -   加速版：tile化，不断切割小矩阵，然后进行矩阵运算，减少频繁读取global memore的损耗时间
+***
+可以，我们用一个非常直观的时间线图来讲。
+
+假设你要处理 3 批数据，每一批都要经历 3 个步骤：
+
+H2D：把数据从 Host（CPU）拷到 Device（GPU）
+Kernel：GPU 计算
+D2H：把结果从 GPU 拷回 CPU
+一、不用 stream：串行执行
+
+如果你不用 stream，或者所有操作都放在默认 stream 里，通常效果就像这样：
+
+时间  ─────────────────────────────────────────────→
+
+Batch1: [H2D] [Kernel] [D2H]
+Batch2:                [H2D] [Kernel] [D2H]
+Batch3:                               [H2D] [Kernel] [D2H]
+
+因为它们是 两个相反方向的数据传输，而现代 GPU 通常有独立的 copy engine（拷贝引擎），并且总线（如 PCIe / NVLink）支持双向同时传输，所以：
+
+一个引擎负责 H2D
+另一个引擎负责 D2H
+
+也可以画得更整齐一点：
+
+时间  ─────────────────────────────────────────────────────→
+
+CPU/GPU:
+Batch1   | H2D | Kernel | D2H |
+Batch2   |                H2D | Kernel | D2H |
+Batch3   |                               H2D | Kernel | D2H |
+特点
+第 1 批没做完，第 2 批不能开始
+传输和计算基本是“排队”的
+GPU 或 PCIe 总线有时会空等
+二、用了多个 stream：流水线重叠
+
+如果你使用多个 stream，并且用的是：
+
+cudaMemcpyAsync
+kernel launch with stream
+合适的 pinned memory
+
+那么就有机会让拷贝和计算重叠：
+
+时间  ─────────────────────────────────────────────────────→
+
+Stream 1: | H2D(1) | Kernel(1) | D2H(1) |
+Stream 2:           | H2D(2) | Kernel(2) | D2H(2) |
+Stream 3:                     | H2D(3) | Kernel(3) | D2H(3) |
+
+如果画成总时间线，会更像这样：
+
+时间  ─────────────────────────────────────────────────────────────→
+
+H2D copy engine:   | H2D(1) | H2D(2) | H2D(3) |
+Compute engine:              | Kernel(1) | Kernel(2) | Kernel(3) |
+D2H copy engine:                        | D2H(1) | D2H(2) | D2H(3) |
+
+这就是流水线（pipeline）。
