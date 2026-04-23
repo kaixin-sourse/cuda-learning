@@ -18,92 +18,87 @@
 
 constexpr int kTileSize = 16;
 constexpr int kRepeats = 5;
-// global
-__global__ void naiveMatmulKernel(const float* a, const float* b, float* c, int n) {
+
+__global__ void naiveMatmulKernel(const float* a, const float* b, float* c,int n) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (row < n && col < n) {
+    if(row < n && col < n) {
         float sum = 0.0f;
-        for (int k = 0; k < n; ++k) {
+        for(int k = 0; k < n; k ++) {
             sum += a[row * n + k] * b[k * n + col];
         }
         c[row * n + col] = sum;
     }
 }
 
-__global__ void tiledMatmulKernel(const float* a, const float* b, float* c, int n) {
+__global__ void tiledMatmulKernel(const float* a,const float* b, float* c, int n) {
     __shared__ float tileA[kTileSize][kTileSize];
     __shared__ float tileB[kTileSize][kTileSize];
 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
-
     float sum = 0.0f;
-
-    for (int tile = 0; tile < (n + kTileSize - 1) / kTileSize; ++tile) {
-        int tiledColA = tile * kTileSize + threadIdx.x;
-        int tiledRowB = tile * kTileSize + threadIdx.y;
-
-        tileA[threadIdx.y][threadIdx.x] =
-            (row < n && tiledColA < n) ? a[row * n + tiledColA] : 0.0f;
-        tileB[threadIdx.y][threadIdx.x] =
-            (tiledRowB < n && col < n) ? b[tiledRowB * n + col] : 0.0f;
-
+    for(int tile = 0; tile < (n + kTileSize - 1) / kTileSize; tile ++) {
+        int tileColA = tile * kTileSize + threadIdx.x;
+        int tileRowB = tile * kTileSize + threadIdx.y;
+        if(row < n && tileColA < n) {
+            tileA[threadIdx.y][threadIdx.x] = a[row * n + tileColA];
+        }
+        if(tileRowB < n && col < n) {
+            tileB[threadIdx.y][threadIdx.x] = b[tileRowB * n + col];
+        }
         __syncthreads();
 
-        for (int k = 0; k < kTileSize; ++k) {
+        for(int k = 0; k < kTileSize; k ++) {
             sum += tileA[threadIdx.y][k] * tileB[k][threadIdx.x];
         }
-
         __syncthreads();
     }
 
-    if (row < n && col < n) {
+    if(row < n && col < n) {
         c[row * n + col] = sum;
     }
+
 }
 
-__global__ void tiledTwoOutputMatmulKernel(const float* a, const float* b, float* c, int n) {
+__global__ void tiledTwoOutputMatmulKernel(const float* a, const float* b, float* c,int n) {
     __shared__ float tileA[kTileSize][kTileSize];
-    __shared__ float tileB[kTileSize][2 * kTileSize];
+    __shared__ float tileB[kTileSize][kTileSize * 2];
 
     int row = blockIdx.y * kTileSize + threadIdx.y;
     int col0 = blockIdx.x * (2 * kTileSize) + threadIdx.x;
     int col1 = col0 + kTileSize;
-
     float sum0 = 0.0f;
     float sum1 = 0.0f;
+    for(int tile = 0; tile <  (n + kTileSize - 1) / kTileSize; tile ++) {
+        int tileColA = tile * kTileSize + threadIdx.x;
+        int tileRowB = tile * kTileSize + threadIdx.y;
 
-    for (int tile = 0; tile < (n + kTileSize - 1) / kTileSize; ++tile) {
-        int tiledColA = tile * kTileSize + threadIdx.x;
-        int tiledRowB = tile * kTileSize + threadIdx.y;
-
-        tileA[threadIdx.y][threadIdx.x] =
-            (row < n && tiledColA < n) ? a[row * n + tiledColA] : 0.0f;
-        tileB[threadIdx.y][threadIdx.x] =
-            (tiledRowB < n && col0 < n) ? b[tiledRowB * n + col0] : 0.0f;
-        tileB[threadIdx.y][threadIdx.x + kTileSize] =
-            (tiledRowB < n && col1 < n) ? b[tiledRowB * n + col1] : 0.0f;
-
+        tileA[threadIdx.y][threadIdx.x] = (row < n && tileColA < n) ? a[row * n + tileColA]:0.0f;
+        tileB[threadIdx.y][threadIdx.x] = (tileRowB < n && col0 < n) ? b[tileRowB * n + col0]:0.0f;
+        tileB[threadIdx.y][threadIdx.x + kTileSize] = (tileRowB < n && col1 < n) ? b[tileRowB * n + col1]:0.0f;
         __syncthreads();
 
-        for (int k = 0; k < kTileSize; ++k) {
+        for(int k = 0; k < kTileSize; k ++) {
             float aValue = tileA[threadIdx.y][k];
             sum0 += aValue * tileB[k][threadIdx.x];
             sum1 += aValue * tileB[k][threadIdx.x + kTileSize];
         }
-
         __syncthreads();
     }
-
-    if (row < n && col0 < n) {
+    if(row < n && col0 < n) {
         c[row * n + col0] = sum0;
     }
-    if (row < n && col1 < n) {
+    if(row < n && col1 < n) {
         c[row * n + col1] = sum1;
     }
 }
+
+
+
+
+
+
 
 struct KernelResult {
     std::string name;
@@ -278,6 +273,7 @@ void runOneSize(int n) {
     CHECK_CUDA(cudaFree(d_tiled));
     CHECK_CUDA(cudaFree(d_twoOutput));
 }
+
 
 int main() {
     std::cout << std::left

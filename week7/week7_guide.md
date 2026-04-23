@@ -4,7 +4,7 @@
 
 这一周的重点不是再写一个新算法，而是建立一个新的工程习惯：
 
-**先 profile，再谈优化。**
+**先 profile（性能分析），再谈优化。**
 
 本周重点有 4 个：
 
@@ -123,7 +123,7 @@ C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.3.2\target\windows-deskt
 
 ## 5.1 `src/profile_reduction_target.cu`
 
-这是一个专门为了 profiling 准备的 reduction target。
+    这是一个专门为了 profiling 准备的 reduction target。
 
 它会：
 

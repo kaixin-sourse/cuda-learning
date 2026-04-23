@@ -19,7 +19,8 @@
 
 constexpr int kNumBins = 16;
 constexpr int kBlockSize = 256;
-
+// all process try to add in the same time.
+// easy to take up one bin,cost lots of time.
 __global__ void globalAtomicHistogramKernel(const int* input, int* globalHist, int n) {
     for (int idx = blockIdx.x * blockDim.x + threadIdx.x; idx < n; idx += blockDim.x * gridDim.x) {
         int value = input[idx];
@@ -58,6 +59,7 @@ __global__ void sharedAtomicHistogramKernel(const int* input, int* globalHist, i
          idx += blockDim.x * gridDim.x) {
         int value = input[idx];
         if (value >= 0 && value < kNumBins) {
+            // avoid the concentration of the globalHist
             atomicAdd(&localHist[value], 1);
         }
     }

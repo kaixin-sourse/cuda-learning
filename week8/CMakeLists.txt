@@ -8,7 +8,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-add_executable(week8_matmul_optimization_compare src/matmul_optimization_compare.cu)
+add_executable(week8_matmul_optimization_compare
+        src/matmul_optimization_compare.cu
+)
+
+add_executable(week8_try
+        src/try.cu
+)
+
 set_target_properties(week8_matmul_optimization_compare PROPERTIES
-    CUDA_SEPARABLE_COMPILATION ON
+        CUDA_SEPARABLE_COMPILATION ON
+)
+
+set_target_properties(week8_try PROPERTIES
+        CUDA_SEPARABLE_COMPILATION ON
 )
