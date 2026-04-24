@@ -2019,3 +2019,5 @@ pinned memory 不是存到某个“特殊新区域”里，它本质上还是在
 ![img.png](img.png)
 
 ![image-20260424123230820](C:\Users\27996\AppData\Roaming\Typora\typora-user-images\image-20260424123230820.png)
+
+![img_1.png](img_1.png)
