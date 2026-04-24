@@ -12,3 +12,8 @@ add_executable(week9_stream_overlap_compare src/stream_overlap_compare.cu)
 set_target_properties(week9_stream_overlap_compare PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
+
+target_compile_options(week9_stream_overlap_compare PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:/utf-8>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>
+)

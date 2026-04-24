@@ -10,10 +10,10 @@
 ## Results
 
 | Version | Time(ms) | Check | Notes |
-|---|---:|---|---|
-| Pageable sequential | | | |
-| Pinned sequential | | | |
-| Pinned multi-stream | | | |
+|---|---------:|-------|---|
+| Pageable sequential |  72.0532 | PASS  | |
+| Pinned sequential |  27.6066 | PASS  | |
+| Pinned multi-stream |  13.2901 | PASS  | |
 
 ## Timeline Observations
 

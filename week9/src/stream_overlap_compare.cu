@@ -172,17 +172,21 @@ RunResult runPinnedMultiStream() {
 
     double start = nowMs();
     for (int chunk = 0; chunk < numChunks; ++chunk) {
+        // 当前chunk放到第几个stream中
         int streamId = chunk % kStreamCount;
+        // 当前chunk在总数组中的起始位置
         int offset = chunk * kChunkElements;
+        // 最后一个chunk可能不满
         int currentElements = std::min(kChunkElements, kTotalElements - offset);
         size_t currentBytes = static_cast<size_t>(currentElements) * sizeof(float);
         int gridSize = (currentElements + kBlockSize - 1) / kBlockSize;
-
+        // 异步拷贝，cpu2gpu，使用第streamId这个stream
         CHECK_CUDA(cudaMemcpyAsync(d_input[streamId],
                                    h_input + offset,
                                    currentBytes,
                                    cudaMemcpyHostToDevice,
                                    streams[streamId]));
+        // 不使用共享内存
         scaleKernel<<<gridSize, kBlockSize, 0, streams[streamId]>>>(
             d_input[streamId], d_temp[streamId], currentElements, kAlpha);
         CHECK_CUDA(cudaGetLastError());
@@ -195,7 +199,7 @@ RunResult runPinnedMultiStream() {
                                    cudaMemcpyDeviceToHost,
                                    streams[streamId]));
     }
-
+    // 等待stream上面所有的任务都完成，才能向下走
     CHECK_CUDA(cudaDeviceSynchronize());
     double stop = nowMs();
 
