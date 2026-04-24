@@ -2009,3 +2009,13 @@ Compute engine:              | Kernel(1) | Kernel(2) | Kernel(3) |
 D2H copy engine:                        | D2H(1) | D2H(2) | D2H(3) |
 
 这就是流水线（pipeline）。
+
+pinned memory 不是存到某个“特殊新区域”里，它本质上还是在 主机内存（RAM） 里。
+
+更准确地说：
+
+它是在操作系统管理的普通物理内存页中，只不过这些页被“锁住”了，不能被换出到磁盘。
+
+![img.png](img.png)
+
+![image-20260424123230820](C:\Users\27996\AppData\Roaming\Typora\typora-user-images\image-20260424123230820.png)
