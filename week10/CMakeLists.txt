@@ -12,3 +12,8 @@ add_executable(week10_mini_library_benchmark src/mini_library_benchmark.cu)
 set_target_properties(week10_mini_library_benchmark PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
 )
+
+target_compile_options(week10_mini_library_benchmark PRIVATE
+        $<$<COMPILE_LANGUAGE:CXX>:/utf-8>
+        $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/utf-8>
+)
